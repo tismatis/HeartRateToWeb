@@ -1,7 +1,7 @@
-﻿<Application x:Class="HeartRateToWeb.App"
+﻿<Application x:Class="HeartRateGear.Web.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:HeartRateToWeb"
+             xmlns:local="clr-namespace:HeartRateGear.Web"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
          

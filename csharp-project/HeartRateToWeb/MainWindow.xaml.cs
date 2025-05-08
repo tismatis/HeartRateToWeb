@@ -1,88 +1,105 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
-using HRServer;
-
-namespace HeartRateToWeb
+namespace HeartRateGear.Web
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
+        /// <summary>
+        /// Client for the HeartRateServerNotify
+        /// </summary>
+        private HeartRateServerNotify _client;
 
-        private HeartRateServer _client = null;
-
-        public HeartRateServer Client
-        {
-            get { return _client; }
-            set { _client = value; }
-        }
-
+        /// <summary>
+        /// Constructor for the MainWindow
+        /// </summary>
         public MainWindow()
         {
             InitializeComponent();
 
-            Client = new HeartRateServer(6547);
-            Receiver.DataContext = Client;
-            ListboxIPs.ItemsSource = Client.Server.Prefixes;
-
+            _client = new HeartRateServerNotify(6547);
+            Receiver.DataContext = _client;
+            ListboxIPs.ItemsSource = _client.Prefixes;
         }
 
+        /// <summary>
+        /// When the button is clicked, it will start or stop the server
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void ButtonServer_Click(object sender, RoutedEventArgs e)
         {
+            string status = "OFF";
 
-            String status = "OFF";
-
-            if (Client.IsServerStarted) {
+            if (_client.IsServerStarted) {
                 status = "OFF";
                 ButtonServer.Content = "START SERVER";
                 BoxServerStatus.Background = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // #e74c3c rgb(231, 76, 60)
                 
-                Client.StopServer();
+                _client.Stop();
             }
             else
             {
                 try
                 {
-                    Client.StartServer();
+                    RegenerateServerClient();
+                    
+                    _client.Start();
                     status = "ON";
                     ButtonServer.Content = "STOP SERVER";
                     BoxServerStatus.Background = new SolidColorBrush(Color.FromRgb(44, 204, 113)); // #2ecc71
-
                 }
-                catch (Exception exp)
+                catch (AccessViolationException exp)
                 {
-                    MessageBox.Show("Please lauch the program as admin, to create the Web Server.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Please launch the program as admin, to create the Web Server.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
 
             LabelServerStatus.Content = status;
         }
 
+        /// <summary>
+        /// When pressed, copy the selected IP address to the clipboard
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void CopyActiveIP_Click(object sender, RoutedEventArgs e)
         {
-            if (ListboxIPs.SelectedItem != null)
-            {
-                String ip = ListboxIPs.SelectedItem.ToString();
-                Clipboard.SetText(ip);
-            }
-            else
+            string ip = ListboxIPs.SelectedItem?.ToString();
+            
+            if (String.IsNullOrEmpty(ip))
             {
                 MessageBox.Show("Please select an address.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-            } 
+                return;
+            }
+
+            try
+            {
+                Clipboard.SetText(ip);
+            }
+            catch (Exception ex)
+            {
+                //?
+            }
+        }
+
+        /// <summary>
+        /// When the port is changed, it will regenerate the server client
+        /// </summary>
+        private void RegenerateServerClient()
+        {
+            int port = 6547;
+            
+            if(!String.IsNullOrEmpty(TextboxPort.Text) && int.TryParse(TextboxPort.Text, out int newPort))
+                port = newPort;
+            
+            _client = new HeartRateServerNotify(port);
+            Receiver.DataContext = _client;
+            ListboxIPs.ItemsSource = _client.Prefixes;
         }
     }
 }

@@ -1,247 +1,200 @@
 ﻿using System;
-using System.Net;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
-using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
-using System.ComponentModel;
 
-namespace HRServer
+namespace HeartRateGear.Server
 {
-    public class HeartRateServer : INotifyPropertyChanged
+    public class HeartRateServer
     {
-
+        /// <summary>
+        /// The HTTP server.
+        /// </summary>
+        private readonly HttpListener _server;
         
+        /// <summary>
+        /// Variable is used to stop the server.
+        /// </summary>
+        private bool _tryStop;
+        
+        /// <summary>
+        /// The servicing task, it is used to handle incoming requests.
+        /// </summary>
+        private Task _servicingTask;
+        
+        /// <summary>
+        /// Heart rate value.
+        /// </summary>
+        private int _heartRate;
+        
+        /// <summary>
+        /// Determine if the server is started.
+        /// </summary>
+        public bool IsServerStarted => _server is { IsListening: true };
+        
+        /// <summary>
+        /// Expose the prefixes from the server.
+        /// </summary>
+        public HttpListenerPrefixCollection Prefixes => _server.Prefixes;
+        
+        /// <summary>
+        /// This method is called when the heart rate is updated.
+        /// </summary>
+        public event EventHandler<int> HeartRateUpdated;
 
-        private HttpListener _server;
-        private int _port = 6547;
-
-        private String _webRoot = Directory.GetCurrentDirectory() + @"/www/";
-
-        private String _lastUpdate = "hh:mm:ss";
-        private bool _isServerStarted = false;
-
-        private String _bpm = "000";
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-
-        public bool IsServerStarted
+        /// <summary>
+        /// Constructor for the HeartRateServer class.
+        /// </summary>
+        /// <param name="port">by default 6547</param>
+        public HeartRateServer(int port = 6547)
         {
-            get { return _isServerStarted; }
-            set { _isServerStarted = value; }
-        }
-
-        public String LastUpdate
-        {
-            get { return _lastUpdate; }
-            set 
-            {
-                _lastUpdate = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LastUpdate"));
-            }
-        }
-
-        public String BPM
-        {
-            get { return _bpm; }
-            set 
-            { 
-                _bpm = value;
-                LastUpdate = DateTime.Now.ToString("HH:mm:ss");
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("BPM"));
-            }
-        }
-
-        public HttpListener Server
-        {
-            get { return _server; }
-            private set { _server = value; }
-        }
-
-        public String WebRoot
-        {
-            get { return _webRoot; }
-        }
-
-        public int Port
-        {
-            get { return _port; }
-            set { 
-                if (value > 65535 || value <= 0) {
-                    _port = 6547;
-                } else{
-                    _port = value;
-                }
-            }
-        }
-
-        public HeartRateServer(int port)
-        {
-            Port = port;
-            Server = new HttpListener();  // this is the http server
+            _server = new HttpListener();
+            _tryStop = false;
+            
+            var port1 = port;
+            _server = new HttpListener();
             string hostName = Dns.GetHostName();
 
-            Server.Prefixes.Add("http://127.0.0.1:" + Port + "/");  //we set a listening address here (localhost)
-            Server.Prefixes.Add("http://localhost:" + Port + "/");  //we set a listening address here (localhost)
+            _server.Prefixes.Add("http://127.0.0.1:" + port1 + "/");
+            _server.Prefixes.Add("http://localhost:" + port1 + "/");
 
             foreach (IPAddress ip in Dns.GetHostEntry(hostName).AddressList)
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    _server.Prefixes.Add("http://" + ip + ":"+ port1 +"/");
+            
+            HeartRateUpdated += OnHeartRateUpdated;
+        }
+
+        /// <summary>
+        /// Start the HTTP server.
+        /// </summary>
+        public void Start()
+        {
+            _server.Start();
+            _servicingTask = Servicing();
+        }
+
+        /// <summary>
+        /// Stop the HTTP server.
+        /// </summary>
+        public void Stop()
+        {
+            _server.Stop();
+            _tryStop = true;
+            _servicingTask.Wait();
+        }
+
+        /// <summary>
+        /// This is the main loop of the server.
+        /// </summary>
+        private async Task Servicing()
+        {
+            while (!_tryStop)
             {
-                if (ip.AddressFamily.ToString() == "InterNetwork")
+                var context = await _server.GetContextAsync();
+                var request = context.Request;
+                var response = context.Response;
+
+                // Add CORS headers
+                response.Headers.Add("Access-Control-Allow-Origin", "*");
+                response.Headers.Add("Access-Control-Allow-Methods", "GET");
+                response.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
+                
+                string responseString;
+
+                Console.WriteLine($"{DateTime.UtcNow} - {request.HttpMethod} {request.Url} {request.UserHostAddress}");
+                
+                switch (request.HttpMethod)
                 {
-                    Server.Prefixes.Add("http://" + ip + ":"+ Port +"/");  //we set a listening address here (localhost)
+                    case "GET":
+                        if (!request.Url.LocalPath.StartsWith("/obs"))
+                        {
+                            responseString = HandleGetRequest(request, response);
+                            break;
+                        }
+
+                        if (String.IsNullOrEmpty(request.Url.LocalPath.Substring(4)))
+                        {
+                            response.StatusCode = 302;
+                            response.RedirectLocation = "/obs/";
+                            responseString = "Redirecting to /obs/";
+                            break;
+                        }
+                        
+                        if (String.IsNullOrEmpty(request.Url.LocalPath.Substring(5)))
+                        {
+                            responseString = File.ReadAllText($"{Environment.CurrentDirectory}/www/index.html");
+                            break;
+                        }
+                            
+                        string path = request.Url.LocalPath.Substring(5);
+                        if (!File.Exists($"{Environment.CurrentDirectory}/www/{path}"))
+                        {
+                            response.StatusCode = 404;
+                            responseString = "File not found";
+                            break;
+                        }
+                            
+                        responseString = File.ReadAllText($"{Environment.CurrentDirectory}/www/{path}");
+                        break;
+                    case "POST":
+                        responseString = HandlePostRequest(request, response);
+                        break;
+                    default:
+                        response.StatusCode = 405;
+                        responseString = "Method not allowed";
+                        break;
                 }
+
+                byte[] buffer = Encoding.UTF8.GetBytes(responseString);
+                response.ContentLength64 = buffer.Length;
+                using var output = response.OutputStream;
+                await output.WriteAsync(buffer, 0, buffer.Length);
             }
-
-
         }
 
-        public void StartServer()
-        {
-            this.StartListener();
-            this.WaitNextRequest();
-            IsServerStarted = true;
+        /// <summary>
+        /// This method handles GET requests.
+        /// </summary>
+        /// <returns>Content of response</returns>
+        private string HandleGetRequest(HttpListenerRequest request, HttpListenerResponse response) => _heartRate.ToString();
 
-        }
-
-        private void WaitNextRequest()
+        /// <summary>
+        /// This method handles POST requests.
+        /// </summary>
+        /// <returns>Content of response</returns>
+        private string HandlePostRequest(HttpListenerRequest request, HttpListenerResponse response)
         {
+            var dataText = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
+            var clean = HttpUtility.ParseQueryString(dataText);
+
+            if(!int.TryParse(clean.Get("rate"), out int result))
+                throw new HttpListenerException(400, "Invalid heart rate value.");
             
-               IAsyncResult context = Server.BeginGetContext(new AsyncCallback(ListenerCallBack), Server);
-            
-            
+            HeartRateUpdated?.Invoke(this, result == 0 ? -1 : result);
+
+            return "OK";
         }
-
-        public void StopServer()
+        
+        /// <summary>
+        /// This method is called when the heart rate is updated.
+        /// It writes the heart rate to a file and update the local value of _heartRate.
+        /// </summary>
+        private void OnHeartRateUpdated(object sender, int rate)
         {
-            this.StopListener();
-            Server.Stop();
-            IsServerStarted = false;
-
-
-            //
-
-            Server = new HttpListener();  // this is the http server
-            string hostName = Dns.GetHostName();
-
-            Server.Prefixes.Add("http://127.0.0.1:" + Port + "/");  //we set a listening address here (localhost)
-            Server.Prefixes.Add("http://localhost:" + Port + "/");  //we set a listening address here (localhost)
-
-            foreach (IPAddress ip in Dns.GetHostEntry(hostName).AddressList)
-            {
-                if (ip.AddressFamily.ToString() == "InterNetwork")
-                {
-                    Server.Prefixes.Add("http://" + ip + ":" + Port + "/");  //we set a listening address here (localhost)
-                }
-            }
-
-        }
-
-        private void ListenerCallBack(IAsyncResult result)
-        {
-            HttpListener listener = (HttpListener)result.AsyncState;
-
-            HttpListenerContext context;
             try
             {
-                context = listener.EndGetContext(result);
+                File.WriteAllText($"{Environment.CurrentDirectory}/hr.txt", rate.ToString());
             }
-            catch (Exception exp)
+            catch
             {
-                return; 
-            } 
-
-            HttpListenerResponse response = context.Response;
-
-            string file = context.Request.Url.LocalPath;
-            if (file == "/")
-            {
-                file = @"index.html";
+                Console.WriteLine("We weren't able to write the heart rate to the file.");
             }
-
-            string page = WebRoot + file;
-            //this will get the page requested by the browser 
-
-            String msg = "";
-            try
-            {
-                if (context.Request.HttpMethod.Contains("GET"))
-                {
-                    msg = HandleGETRequest(page);
-                }
-                else if (context.Request.HttpMethod.Contains("POST"))
-                {
-                    msg = HandlePOSTRequest(context);
-                }
-                else
-                {
-                    throw new HttpListenerException(405, "Request method non supported.");
-                }
-            }
-            catch (FileNotFoundException fnfe)
-            {
-                response.StatusCode = 404;
-                Console.Out.WriteLine("/!/ 404 ! => " + fnfe.Message);
-
-            }
-            catch (Exception e)
-            {
-                Console.Out.WriteLine("Erreur ! => " + e.Message);
-            }
-
-
-            byte[] buffer = Encoding.UTF8.GetBytes(msg);
-            //then we transform it into a byte array
-            response.ContentLength64 = buffer.Length;  // set up the messasge's length
-            Stream st = response.OutputStream;  // here we create a stream to send the message
-            st.Write(buffer, 0, buffer.Length); // and this will send all the content to the browser
-            context.Response.Close();  // here we close the connection
-
-            this.WaitNextRequest();
-
+            
+            _heartRate = rate;
         }
-
-        private void StartListener()
-        {
-            Server.Start();
-        }
-
-        private void StopListener()
-        {
-            Server.Stop();
-        }
-
-        public String HandleGETRequest(String page) {
-
-            TextReader tr = new StreamReader(page);
-            return tr.ReadToEnd();  //getting the page's content
-
-        }
-
-        public String HandlePOSTRequest(HttpListenerContext context)
-        {
-            var data_text = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding).ReadToEnd();
-            var clean = HttpUtility.ParseQueryString(data_text);
-
-            string hr = clean.Get("rate");
-            BPM = hr;
-            if (!Directory.Exists(@"./www/"))
-            {
-                Directory.CreateDirectory(@"./www/");
-            }
-            using (StreamWriter file = new StreamWriter(@"./www/hr.txt", false))
-            {
-                file.WriteLine(hr);
-            }
-
-            return "OK"; // answer provided to the smart watch for an "ack"
-
-        }
-
-        
-
-        
-
-
     }
 }

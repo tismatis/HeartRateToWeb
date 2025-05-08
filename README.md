@@ -1,10 +1,18 @@
 # HeartRateToWeb
 
+## Credits
+
+This project has been made originally by [@loic2665](https://github.com/loic2665).
+Here the original link to the [repository](https://github.com/loic2665/HeartRateToWeb).
+The CSharp project has been cleaned, you should note that the python one didn't got any updates.
+
 ## Introduction
 
 This program let you use the heart sensor of your Samsung Watch to display it on software that can read file like OBS. (tutorial below + watch compatibility list below). 
 
-This is a simple python program that react like a mini web server without the need of installing software like WAMP / LAMP or other web server like Apache / Nginix.
+You will find there a python HTTP server and two CSharp HTTP server with one more user friendly because of the UI.
+
+There is a module for [VRCOSC](https://github.com/VolcanicArts/VRCOSC) if you are interested too.
 
 ## How does it work ?
 
@@ -18,20 +26,17 @@ To maximise the compatibility between devices, I started the project on a web ap
 
 #### Windows
 
-
 On Windows you can use two easy ways.
 
 ##### CSharp
 
-Just go to the release section, download the last zip with "csharp" in the name,
-and run it as admin, you will have some IP showed up, take the appropried one,
-and insert it in your watch. Click on "Start Server" and start on your watch and
-you will get data into your computer.
+*You should note that you need the [.NET Core 3.1](https://dotnet.microsoft.com/fr-fr/download/dotnet/3.1) to run this app.*
 
-The output file `hr.txt` is in the `www` folder where the executable is.
+Download the last release and launch one of the program `HeartRateToWeb.exe` or `TestHeartRateToWeb.exe`.
+
+For get the current BPM count, just fetch `http://<local-ip>:6547` and you will get the data.
 
 ##### Python
-
 
 Download the program in the release section, to be sure, put the program in is own folder
 and double click on it, you will see your IP and Port to enter in the wearable app.
@@ -44,7 +49,7 @@ If you have python3+ installed you can launch the program in a Powershell
 by typing : 
 
 ```
-PS > C:\Users\username\Downloads\heartbeat>python main.py [port]
+PS > C:\Users\<username>\Downloads\heartbeat>python main.py [port]
 ``` 
 #### Linux
 
@@ -71,27 +76,24 @@ How ?
 
 ## Compatibility
 
-For now, I know for sure the Samsung Galaxy Watch is compatible, I own one
-and it works fine.
 
-Now for the othher watches : 
+| Watch Model                        | Compatibility          | Notes                              |
+|------------------------------------|------------------------|------------------------------------|
+| Samsung Galaxy Watch               | Yes                    |                                    |
+| Samsung Galaxy Watch Active        | Yes                    | Confirmed by others               |
+| Samsung Galaxy Watch Active 2      | Yes                    | Confirmed by others               |
+| Samsung Gear Sport                 | Yes                    | Confirmed by @ikemarx             |
+| Samsung Gear S3                    | Yes      |                                    |
+| Samsung Gear S2                    | Must be compatible     |                                    |
+| Samsung Gear S                     | Unknown                |                                    |
+| Samsung Galaxy Fit(e)              | No                     | No app store available            |
+| Watches before these models        | Likely too old         |                                    |
 
- - Samsung Galaxy Watch : Yes.
- - Samsung Galaxy Watch Active : Yes. (confirmed by others)
- - Samsung Galaxy Watch Active 2 : Yes. (confirmed by others)
- - Samsung Gear Sport : Yes. (confirmed by @ikemarx)
- - Samsung Gear S3 : Must be compatible too.
- - Samsung Gear S2 : Must be compatible too.
- - Samsung Gear S : I don't know at all.
- - Samsung Galaxy Fit(e) : Since there is no app store, no.
- - Watches before this is likely to be too old.
- 
-Now, watches with the Tizen Plaform version 2.3.2 and + 
-is supposed to be compatible.
+Watches with the Tizen Platform version 2.3.2 and above are supposed to be compatible.
 
 #### What about the Huawei Watches, Garmin, etc... ?
 
-Well it's complicated, because I don't own thhese watches. I have no clue if you can create your own app like Samsung.
+Well it's complicated, because I don't own these watches. I have no clue if you can create your own app like Samsung.
 
 ## Todo
 
@@ -102,7 +104,7 @@ Well it's complicated, because I don't own thhese watches. I have no clue if you
 You can find release in the release section. There are none for now.
 I will wait the watch app to be released first.
 
-## Build an exe
+## Build an exe from python
 
 For windows users you can build the script with this command
 
@@ -129,12 +131,12 @@ or the obs endpoint.
 On OBS, you can add a text source, be sure to select "read from a file", and select the `hr.txt` file in the same directory of your
 executable. OBS will take care of refreshing the content automaticly.
 
-#### From /hr endpoint
+#### From / endpoint
 
 Only on Windows as far as I know, you can add a Browser source on your OBS, and enter the following
-address : `http://localhost:6547/hr` this will output the heartrate at this time.
+address : `http://localhost:6547/` this will output the heartrate at this time.
 
-This is **NOT** refreshed every time.
+This is the BPM count at the last record, it's not updated automatically if you add an OBS source, this is useful if you try to create a module for something else.
 
 #### From the /obs endpoint
 
@@ -145,6 +147,10 @@ The `/obs` endpoint output a HTML page with support of CSS and JS.
 jQuery will be used to refresh the heartrate in real time.
 
 Add a browser source with `http://localost:6547/obs` and OBS will start to show the webpage you created.
+
+#### Using VRCOSC
+
+Download the `HeartRateGearVRCOSCModule.dll` and copy it to `C:\Users\<username>\AppData\Roaming\VRCOSC\packages\local`.
 
 ## Demos 
 
