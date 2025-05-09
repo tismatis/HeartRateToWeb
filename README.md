@@ -77,17 +77,17 @@ How ?
 ## Compatibility
 
 
-| Watch Model                        | Compatibility          | Notes                              |
-|------------------------------------|------------------------|------------------------------------|
-| Samsung Galaxy Watch               | Yes                    |                                    |
+| Watch Model                        | Compatibility          | Notes                             |
+|------------------------------------|------------------------|-----------------------------------|
+| Samsung Galaxy Watch               | Yes                    |                                   |
 | Samsung Galaxy Watch Active        | Yes                    | Confirmed by others               |
 | Samsung Galaxy Watch Active 2      | Yes                    | Confirmed by others               |
 | Samsung Gear Sport                 | Yes                    | Confirmed by @ikemarx             |
-| Samsung Gear S3                    | Yes      |                                    |
-| Samsung Gear S2                    | Must be compatible     |                                    |
-| Samsung Gear S                     | Unknown                |                                    |
+| Samsung Gear S3                    | Yes                    | Confirmed by @tismatis            |
+| Samsung Gear S2                    | Must be compatible     |                                   |
+| Samsung Gear S                     | Unknown                |                                   |
 | Samsung Galaxy Fit(e)              | No                     | No app store available            |
-| Watches before these models        | Likely too old         |                                    |
+| Watches before these models        | Likely too old         |                                   |
 
 Watches with the Tizen Platform version 2.3.2 and above are supposed to be compatible.
 
